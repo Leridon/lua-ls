@@ -783,10 +783,11 @@ class LuaFunction(AutodocObjectMixin, sphinx_lua_ls.domain.LuaFunction):
                     ),
                     docutils.nodes.field_body("", docutils.nodes.Text(param.type)),
                 )
+        only_one_return_value = len(self.root.returns) == 1
 
         for i, param in enumerate(self.root.returns):
-            if param.docstring and "\n" in param.docstring:
-                continue
+            return_value_name = param.name or ("" if only_one_return_value else f"_{i + 1}")
+
             if param.parsed_docstring:
                 if param.type:
                     obj = self.objtree.find(param.type)
@@ -805,7 +806,7 @@ class LuaFunction(AutodocObjectMixin, sphinx_lua_ls.domain.LuaFunction):
                 field_list += docutils.nodes.field(
                     "",
                     docutils.nodes.field_name(
-                        "", "return " + (param.name or f"_{i + 1}")
+                        "", "return " + return_value_name
                     ),
                     field_body,
                 )
@@ -813,7 +814,7 @@ class LuaFunction(AutodocObjectMixin, sphinx_lua_ls.domain.LuaFunction):
                 field_list += docutils.nodes.field(
                     "",
                     docutils.nodes.field_name(
-                        "", "rtype " + (param.name or f"_{i + 1}")
+                        "", "rtype " + return_value_name
                     ),
                     docutils.nodes.field_body("", docutils.nodes.Text(param.type)),
                 )
