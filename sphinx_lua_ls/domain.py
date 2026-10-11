@@ -407,8 +407,13 @@ class LuaObject(
             classname = self.env.ref_context.get("lua:class", "")
         fullname = ".".join(filter(None, [modname, classname, name]))
 
-        # Only display full path if we're not inside of a class.
-        prefix = "" if classname else ".".join(filter(None, [modname, classname]))
+        # Class-like declarations show their full path; members only show the owning class's own name.
+        if classname and self.objtype not in ("class", "alias", "enum"):
+            prefix = classname.rsplit(".", 1)[-1]
+        elif modname and not classname and self.objtype in ("function", "data", "table"):
+            prefix = modname.rsplit(".", 1)[-1]
+        else:
+            prefix = ".".join(filter(None, [modname, classname]))
 
         descname = name
         if self.use_colon_path():

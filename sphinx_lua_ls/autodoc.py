@@ -68,10 +68,25 @@ def _iter_children(
         case "alphabetical":
             children.sort(key=lambda ch: ch[0].lower())
         case "groupwise":
+            in_class = obj.kind == Kind.Class
+
+            def function_group(ch: tuple[str, Object]) -> int:
+                # Within classes, keep static methods and instance methods in separate groups.
+                child = ch[1]
+                if not in_class or child.kind != Kind.Function:
+                    return 0
+                doctype = child.parsed_doctype
+                if doctype is None:
+                    params = getattr(child, "params", None)
+                    is_instance = bool(params) and params[0].name == "self"
+                    return 1 if is_instance else 0
+                return 1 if doctype == "method" else 0
+
             children.sort(
                 key=lambda ch: (
                     -ch[1].is_toplevel,
                     (ch[1].kind or Kind.Data).order,
+                    function_group(ch),
                     ch[0],
                 )
             )
