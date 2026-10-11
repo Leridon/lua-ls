@@ -755,13 +755,22 @@ class LuaFunction(AutodocObjectMixin, sphinx_lua_ls.domain.LuaFunction):
         for i, param in enumerate(self.root.params):
             if param.docstring and "\n" in param.docstring:
                 continue
-            if param.parsed_docstring and not (i == 0 and param.name == "self"):
-                if param.type:
-                    obj = self.objtree.find(param.type)
-                    if obj and obj.docstring == param.docstring:
-                        continue
+            if i == 0 and param.name == "self":
+                continue
 
-                field_body = docutils.nodes.field_body("")
+            describe = bool(param.parsed_docstring)
+            if describe and param.type:
+                obj = self.objtree.find(param.type)
+                if obj and obj.docstring == param.docstring:
+                    describe = False
+
+            # The type is part of the field name (``param <type> <name>``), so it
+            # is rendered inline with the parameter instead of in a separate field.
+            name = param.name or f"_{i + 1}"
+            field_name = f"param {param.type} {name}" if param.type else f"param {name}"
+
+            field_body = docutils.nodes.field_body("")
+            if describe:
                 field_body += self.render_docs(
                     str(
                         self.root.docstring_file
@@ -770,32 +779,22 @@ class LuaFunction(AutodocObjectMixin, sphinx_lua_ls.domain.LuaFunction):
                     self.root.line or 0,
                     param.parsed_docstring,
                 )
-                field_list += docutils.nodes.field(
-                    "",
-                    docutils.nodes.field_name("", "param " + (param.name or "_")),
-                    field_body,
-                )
-            if param.type:
-                field_list += docutils.nodes.field(
-                    "",
-                    docutils.nodes.field_name(
-                        "", "type " + (param.name or f"_{i + 1}")
-                    ),
-                    docutils.nodes.field_body("", docutils.nodes.Text(param.type)),
-                )
+            field_list += docutils.nodes.field(
+                "", docutils.nodes.field_name("", field_name), field_body
+            )
+
         only_one_return_value = len(self.root.returns) == 1
 
         for i, param in enumerate(self.root.returns):
-            return_value_name = param.name or ("" if only_one_return_value else f"_{i + 1}")
+            describe = bool(param.parsed_docstring)
+            if describe and param.type:
+                obj = self.objtree.find(param.type)
+                if obj and obj.docstring == param.docstring:
+                    describe = False
 
-            if param.parsed_docstring:
-                if param.type:
-                    obj = self.objtree.find(param.type)
-                    if obj and obj.docstring == param.docstring:
-                        continue
-
-                field_body = docutils.nodes.field_body("")
-                field_body += self.render_docs(
+            description: list[docutils.nodes.Node] = []
+            if describe:
+                description = self.render_docs(
                     str(
                         self.root.docstring_file
                         or f"<docstring for {self.arguments[0]}, param {param.name}>"
@@ -803,21 +802,33 @@ class LuaFunction(AutodocObjectMixin, sphinx_lua_ls.domain.LuaFunction):
                     self.root.line or 0,
                     param.parsed_docstring,
                 )
-                field_list += docutils.nodes.field(
-                    "",
-                    docutils.nodes.field_name(
-                        "", "return " + return_value_name
-                    ),
-                    field_body,
-                )
-            if param.type:
-                field_list += docutils.nodes.field(
-                    "",
-                    docutils.nodes.field_name(
-                        "", "rtype " + return_value_name
-                    ),
-                    docutils.nodes.field_body("", docutils.nodes.Text(param.type)),
-                )
+
+            field_body = docutils.nodes.field_body("")
+
+            if param.name or not only_one_return_value:
+                # Named returns use the typed field syntax ``return <type> <name>``,
+                # so the type is rendered as part of the return entry.
+                name = param.name or f"_{i + 1}"
+                field_name = f"return {param.type} {name}" if param.type else f"return {name}"
+                field_body += description
+            else:
+                # A single unnamed return has no argument for the field transformer
+                # to attach a type to, so the type is rendered into the body directly.
+                field_name = "return"
+                if param.type:
+                    type_par = docutils.nodes.paragraph(
+                        "", "", *utils.type_to_nodes(param.type, self.state.inliner)
+                    )
+                    if description and isinstance(description[0], docutils.nodes.paragraph):
+                        type_par += docutils.nodes.Text(" – ")
+                        type_par.extend(description[0].children)
+                        description = description[1:]
+                    field_body += type_par
+                field_body += description
+
+            field_list += docutils.nodes.field(
+                "", docutils.nodes.field_name("", field_name), field_body
+            )
 
 
 class LuaData(AutodocObjectMixin, sphinx_lua_ls.domain.LuaData):
