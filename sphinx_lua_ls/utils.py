@@ -323,7 +323,7 @@ def type_to_nodes(typ: str, inliner) -> list[nodes.Node]:
             res.append(addnodes.desc_sig_punctuation(text, text))
         elif text := match.group("other"):
             if res and isinstance(res[-1], nodes.Text):
-                res[-1] += text
+                res[-1] = nodes.Text(res[-1] + text)
             else:
                 res.append(nodes.Text(text))
 
